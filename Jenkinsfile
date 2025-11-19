@@ -3,32 +3,36 @@ pipeline {
 
     environment {
         IMAGE_NAME = "sanket558/demo-jenkins-app"
-        CONTAINER_NAME = "demo-jenkins-app"  
+        CONTAINER_NAME = "demo-jenkins-app"
     }
 
     stages {
 
         stage('Build Maven Project') {
+            agent{
+                docker{
+                    image 'maven:3.9.6-eclipse-temurin-21'
+                    args '-v $WORKSPACE:/app -w /app'
+                }
+            }
             steps {
                 echo 'Building Maven project using Dockerized Maven...'
                 sh """
-                    docker run --rm \
-                    -v $WORKSPACE:/app \
-                    -w /app \
-                    maven:3.9.6-eclipse-temurin-21 \
                     mvn clean package -DskipTests
                 """
             }
         }
 
         stage('Test') {
+            agent {
+                docker {
+                    image 'maven:3.9.6-eclipse-temurin-21'
+                    args "-v $WORKSPACE:/app -w /app"
+                }
+            }
             steps {
                 echo 'Running unit tests...'
                 sh """
-                    docker run --rm \
-                    -v $WORKSPACE:/app \
-                    -w /app \
-                    maven:3.9.6-eclipse-temurin-21 \
                     mvn test
                 """
             }
