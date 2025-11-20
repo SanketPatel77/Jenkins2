@@ -9,32 +9,26 @@ pipeline {
     stages {
 
         stage('Build Maven Project') {
-            agent{
-                docker{
-                    image 'maven:3.9.6-eclipse-temurin-21'
-                    args '-v $WORKSPACE:/app -w /app'
-                }
-            }
             steps {
                 echo 'Building Maven project using Dockerized Maven...'
-                sh """
-                    mvn clean package -DskipTests
-                """
+                script {
+                    docker.image('maven:3.9.6-eclipse-temurin-21')
+                          .inside("--user root -v ${WORKSPACE}:/app -w /app") {
+                        sh 'mvn clean package -DskipTests'
+                    }
+                }
             }
         }
 
         stage('Test') {
-            agent {
-                docker {
-                    image 'maven:3.9.6-eclipse-temurin-21'
-                    args "-v $WORKSPACE:/app -w /app"
-                }
-            }
             steps {
                 echo 'Running unit tests...'
-                sh """
-                    mvn test
-                """
+                script {
+                    docker.image('maven:3.9.6-eclipse-temurin-21')
+                          .inside("--user root -v ${WORKSPACE}:/app -w /app") {
+                        sh 'mvn test'
+                    }
+                }
             }
         }
 
@@ -50,13 +44,11 @@ pipeline {
         stage('Push to Docker Hub') {
             steps {
                 echo 'Logging in and pushing image to Docker Hub...'
-
                 withCredentials([usernamePassword(
                     credentialsId: 'dockerhub-creds',
                     usernameVariable: 'DOCKERHUB_USER',
                     passwordVariable: 'DOCKERHUB_PASS'
                 )]) {
-
                     sh """
                         echo "$DOCKERHUB_PASS" | docker login -u "$DOCKERHUB_USER" --password-stdin
                         docker push ${IMAGE_NAME}:latest
@@ -68,7 +60,6 @@ pipeline {
         stage('Deploy') {
             steps {
                 echo 'Deploying container...'
-
                 sh """
                     docker stop ${CONTAINER_NAME} || true
                     docker rm ${CONTAINER_NAME} || true
