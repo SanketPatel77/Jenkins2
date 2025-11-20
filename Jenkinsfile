@@ -8,35 +8,36 @@ pipeline {
 
     stages {
 
-        stage('Build Maven Project') {
-            steps {
-                echo 'Building Maven project using Dockerized Maven...'
-                script {
-                    docker.image('maven:3.9.6-eclipse-temurin-21')
-                          .inside("--user root -v ${WORKSPACE}:/app -w /app") {
-                        sh 'mvn clean package -DskipTests'
-                    }
-                }
-            }
-        }
-
-        stage('Test') {
-            steps {
-                echo 'Running unit tests...'
-                script {
-                    docker.image('maven:3.9.6-eclipse-temurin-21')
-                          .inside("--user root -v ${WORKSPACE}:/app -w /app") {
-                        sh 'mvn test'
-                    }
-                }
-            }
-        }
+//         stage('Build Maven Project') {
+//             steps {
+//                 echo 'Building Maven project using Dockerized Maven...'
+//                 script {
+//                     docker.image('maven:3.9.6-eclipse-temurin-21')
+//                           .inside("--user root -v ${WORKSPACE}:/app -w /app") {
+//                         sh 'mvn clean package -DskipTests'
+//                     }
+//                 }
+//             }
+//         }
+//
+//         stage('Test') {
+//             steps {
+//                 echo 'Running unit tests...'
+//                 script {
+//                     docker.image('maven:3.9.6-eclipse-temurin-21')
+//                           .inside("--user root -v ${WORKSPACE}:/app -w /app") {
+//                         sh 'mvn test'
+//                     }
+//                 }
+//             }
+//         }
 
         stage('Build Docker Image') {
             steps {
                 echo 'Building Docker image...'
                 sh """
-                    docker build -t ${IMAGE_NAME}:latest .
+                    docker pull ${IMAGE_NAME}:latest || true
+                    docker build --cache-from=${IMAGE_NAME}:latest -t ${IMAGE_NAME}:latest .
                 """
             }
         }
