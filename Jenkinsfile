@@ -4,47 +4,35 @@ pipeline {
     environment {
         IMAGE_NAME = "sanket558/demo-jenkins-app"
         CONTAINER_NAME = "demo-jenkins-app"
+        TAG = "${BUILD_NUMBER}"
+    }
+
+    options {
+        timeout(time: 20, unit: 'MINUTES')
+        buildDiscarder(logRotator(numToKeepStr: '20'))
+        timestamps()
     }
 
     stages {
-
-//         stage('Build Maven Project') {
-//             steps {
-//                 echo 'Building Maven project using Dockerized Maven...'
-//                 script {
-//                     docker.image('maven:3.9.6-eclipse-temurin-21')
-//                           .inside("--user root -v ${WORKSPACE}:/app -w /app") {
-//                         sh 'mvn clean package -DskipTests'
-//                     }
-//                 }
-//             }
-//         }
-//
-//         stage('Test') {
-//             steps {
-//                 echo 'Running unit tests...'
-//                 script {
-//                     docker.image('maven:3.9.6-eclipse-temurin-21')
-//                           .inside("--user root -v ${WORKSPACE}:/app -w /app") {
-//                         sh 'mvn test'
-//                     }
-//                 }
-//             }
-//         }
 
         stage('Build Docker Image') {
             steps {
                 echo 'Building Docker image...'
                 sh """
                     docker pull ${IMAGE_NAME}:latest || true
-                    docker build --cache-from=${IMAGE_NAME}:latest -t ${IMAGE_NAME}:latest .
+
+                    docker build \
+                        --cache-from=${IMAGE_NAME}:latest \
+                        -t ${IMAGE_NAME}:latest \
+                        -t ${IMAGE_NAME}:${TAG} \
+                        .
                 """
             }
         }
 
         stage('Push to Docker Hub') {
             steps {
-                echo 'Logging in and pushing image to Docker Hub...'
+                echo "Pushing image to Docker Hub..."
                 withCredentials([usernamePassword(
                     credentialsId: 'dockerhub-creds',
                     usernameVariable: 'DOCKERHUB_USER',
@@ -52,33 +40,64 @@ pipeline {
                 )]) {
                     sh """
                         echo "$DOCKERHUB_PASS" | docker login -u "$DOCKERHUB_USER" --password-stdin
+
                         docker push ${IMAGE_NAME}:latest
+                        docker push ${IMAGE_NAME}:${TAG}
                     """
                 }
             }
         }
 
-        stage('Deploy') {
+        stage('Deploy to Production') {
             steps {
                 echo 'Deploying container...'
+
                 sh """
+                    # Rollback backup:
+                    docker pull ${IMAGE_NAME}:latest || true
+
                     docker stop ${CONTAINER_NAME} || true
                     docker rm ${CONTAINER_NAME} || true
-                    docker run -d -p 9090:9090 --name ${CONTAINER_NAME} ${IMAGE_NAME}:latest
+
+                    docker run -d \
+                        -p 9090:9090 \
+                        --name ${CONTAINER_NAME} \
+                        ${IMAGE_NAME}:latest
                 """
+
+                echo "Waiting for service to start..."
+
+                sleep 5
+            }
+        }
+
+        stage('Health Check') {
+            steps {
+                echo "Checking service health..."
+                script {
+                    sh """
+                        curl -f http://localhost:9090 || exit 1
+                    """
+                }
             }
         }
     }
 
     post {
-        always {
-            echo 'Pipeline finished.'
-        }
         success {
-            echo 'Project deployed successfully!'
+            echo '🚀 Deployment successful and app is healthy!'
         }
         failure {
-            echo 'Pipeline failed.'
+            echo '❌ Deployment failed — rolling back.'
+
+            sh """
+                docker stop ${CONTAINER_NAME} || true
+                docker rm ${CONTAINER_NAME} || true
+                docker run -d -p 9090:9090 --name ${CONTAINER_NAME} ${IMAGE_NAME}:latest
+            """
+        }
+        always {
+            echo 'Pipeline finished.'
         }
     }
 }
