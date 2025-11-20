@@ -76,7 +76,7 @@ pipeline {
                 echo "Checking service health..."
                 script {
                     sh """
-                        curl -f http://localhost:9090 || exit 1
+                        curl -f http://localhost:9090/jenkins/greet || exit 1
                     """
                 }
             }
