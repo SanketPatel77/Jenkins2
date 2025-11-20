@@ -77,7 +77,7 @@ pipeline {
                 script {
                     timeout(time: 30, unit: 'SECONDS') {
                         retry(5) {
-                            sh 'curl -f http://localhost:9090'
+                            sh 'curl -f http://localhost:9090/jenkins/greet'
                             sleep 3
                        }
                    }
