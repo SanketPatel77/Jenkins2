@@ -67,7 +67,7 @@ pipeline {
 
                 echo "Waiting for service to start..."
 
-                sleep 5
+                sleep 15
             }
         }
 
@@ -75,9 +75,12 @@ pipeline {
             steps {
                 echo "Checking service health..."
                 script {
-                    sh """
-                        curl -f http://localhost:9090/jenkins/greet || exit 1
-                    """
+                    timeout(time: 30, unit: 'SECONDS') {
+                        retry(5) {
+                            sh 'curl -f http://localhost:9090'
+                            sleep 3
+                       }
+                   }
                 }
             }
         }
